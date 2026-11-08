@@ -1,0 +1,93 @@
+{
+  "timestamp": "2026-11-08T14:00:00Z",
+  "hostname": "synthetic-laptop-01.corp.example.com",
+  "os": "Windows 11 Enterprise (23H2)",
+  "airplane_mode": false,
+  "adapters": [
+    {
+      "name": "Wi-Fi",
+      "type": "Wireless80211",
+      "status": "Up",
+      "mac_address": "00:11:22:33:44:55",
+      "ipv4_addresses": [
+        "192.0.2.145"
+      ],
+      "subnet_mask": "255.255.255.0",
+      "ipv6_addresses": [
+        "2001:db8::145"
+      ],
+      "default_gateways": [
+        "192.0.2.1"
+      ],
+      "dns_servers": [
+        "192.0.2.10",
+        "192.0.2.11"
+      ],
+      "dhcp_enabled": true,
+      "dhcp_lease_obtained": "2026-11-08T08:00:00Z",
+      "dhcp_lease_expires": "2026-11-08T16:00:00Z",
+      "dhcp_server": "192.0.2.1"
+    }
+  ],
+  "wifi": {
+    "connected": true,
+    "ssid": "Corp-Secure-WiFi",
+    "bssid": "00:11:22:aa:bb:cc",
+    "signal_percent": 88,
+    "radio_type": "802.11ax",
+    "channel": 36,
+    "authentication": "WPA3-Enterprise",
+    "cipher": "CCMP"
+  },
+  "gateway_reachability": {
+    "gateway_ip": "192.0.2.1",
+    "packets_sent": 4,
+    "packets_received": 4,
+    "packet_loss_percent": 0.0,
+    "avg_rtt_ms": 3.2
+  },
+  "dns_tests": [
+    {
+      "target": "gateway.local",
+      "server": "192.0.2.10",
+      "resolved": true,
+      "resolved_ips": [
+        "192.0.2.1"
+      ],
+      "rtt_ms": 2.1
+    },
+    {
+      "target": "portal.corp.example.com",
+      "server": "192.0.2.10",
+      "resolved": true,
+      "resolved_ips": [
+        "192.0.2.50"
+      ],
+      "rtt_ms": 4.5
+    },
+    {
+      "target": "dns.google",
+      "server": "192.0.2.10",
+      "resolved": true,
+      "resolved_ips": [
+        "8.8.8.8",
+        "8.8.4.4"
+      ],
+      "rtt_ms": 14.2
+    }
+  ],
+  "http_probe": {
+    "url": "http://www.msftconnecttest.com/connecttest.txt",
+    "status_code": 200,
+    "response_body_snippet": "Microsoft Connect Test",
+    "is_captive_portal": false,
+    "redirect_url": null
+  },
+  "vpn": {
+    "client_installed": "Cisco AnyConnect",
+    "connected": false,
+    "adapter_name": null,
+    "assigned_ip": null,
+    "tunnel_routes": []
+  }
+}

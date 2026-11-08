@@ -1,0 +1,105 @@
+{
+  "timestamp": "2026-11-08T14:30:00Z",
+  "hostname": "synthetic-laptop-07.corp.example.com",
+  "os": "Windows 11 Enterprise (23H2)",
+  "airplane_mode": false,
+  "adapters": [
+    {
+      "name": "Wi-Fi",
+      "type": "Wireless80211",
+      "status": "Up",
+      "mac_address": "00:11:22:33:44:bb",
+      "ipv4_addresses": [
+        "192.0.2.133"
+      ],
+      "subnet_mask": "255.255.255.0",
+      "ipv6_addresses": [],
+      "default_gateways": [
+        "192.0.2.1"
+      ],
+      "dns_servers": [
+        "1.1.1.1"
+      ],
+      "dhcp_enabled": true,
+      "dhcp_lease_obtained": "2026-11-08T08:00:00Z",
+      "dhcp_lease_expires": "2026-11-08T16:00:00Z",
+      "dhcp_server": "192.0.2.1"
+    },
+    {
+      "name": "Palo Alto GlobalProtect Virtual Network Adapter",
+      "type": "VirtualTunnel",
+      "status": "Up",
+      "mac_address": "00:11:22:99:88:77",
+      "ipv4_addresses": [
+        "198.51.100.45"
+      ],
+      "subnet_mask": "255.255.255.255",
+      "ipv6_addresses": [],
+      "default_gateways": [],
+      "dns_servers": [
+        "198.51.100.10"
+      ],
+      "dhcp_enabled": false,
+      "dhcp_lease_obtained": null,
+      "dhcp_lease_expires": null,
+      "dhcp_server": null
+    }
+  ],
+  "wifi": {
+    "connected": true,
+    "ssid": "Home-Network-5G",
+    "bssid": "00:11:22:cc:dd:ee",
+    "signal_percent": 94,
+    "radio_type": "802.11ax",
+    "channel": 149,
+    "authentication": "WPA3-Personal",
+    "cipher": "CCMP"
+  },
+  "gateway_reachability": {
+    "gateway_ip": "192.0.2.1",
+    "packets_sent": 4,
+    "packets_received": 4,
+    "packet_loss_percent": 0.0,
+    "avg_rtt_ms": 3.8
+  },
+  "dns_tests": [
+    {
+      "target": "intranet.corp.example.com",
+      "server": "1.1.1.1",
+      "resolved": false,
+      "resolved_ips": [],
+      "rtt_ms": null,
+      "error": "NXDOMAIN (Non-Existent Domain returned by public DNS)"
+    },
+    {
+      "target": "dns.google",
+      "server": "1.1.1.1",
+      "resolved": true,
+      "resolved_ips": [
+        "8.8.8.8"
+      ],
+      "rtt_ms": 11.4
+    }
+  ],
+  "http_probe": {
+    "url": "http://www.msftconnecttest.com/connecttest.txt",
+    "status_code": 200,
+    "response_body_snippet": "Microsoft Connect Test",
+    "is_captive_portal": false,
+    "redirect_url": null
+  },
+  "vpn": {
+    "client_installed": "Palo Alto GlobalProtect",
+    "connected": true,
+    "adapter_name": "Palo Alto GlobalProtect Virtual Network Adapter",
+    "assigned_ip": "198.51.100.45",
+    "tunnel_routes": [
+      "198.51.100.0/24"
+    ],
+    "missing_corporate_routes": [
+      "10.0.0.0/8",
+      "172.16.0.0/12"
+    ],
+    "split_dns_leak": true
+  }
+}

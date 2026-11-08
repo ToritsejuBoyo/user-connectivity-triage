@@ -1,0 +1,71 @@
+{
+  "timestamp": "2026-11-08T14:10:00Z",
+  "hostname": "synthetic-laptop-03.corp.example.com",
+  "os": "Windows 11 Enterprise (23H2)",
+  "airplane_mode": false,
+  "adapters": [
+    {
+      "name": "Wi-Fi",
+      "type": "Wireless80211",
+      "status": "Up",
+      "mac_address": "00:11:22:33:44:77",
+      "ipv4_addresses": [
+        "192.0.2.188"
+      ],
+      "subnet_mask": "255.255.255.0",
+      "ipv6_addresses": [],
+      "default_gateways": [
+        "192.0.2.1"
+      ],
+      "dns_servers": [
+        "192.0.2.10"
+      ],
+      "dhcp_enabled": true,
+      "dhcp_lease_obtained": "2026-11-08T08:00:00Z",
+      "dhcp_lease_expires": "2026-11-08T16:00:00Z",
+      "dhcp_server": "192.0.2.1"
+    }
+  ],
+  "wifi": {
+    "connected": true,
+    "ssid": "Corp-Secure-WiFi",
+    "bssid": "00:11:22:aa:bb:99",
+    "signal_percent": 12,
+    "radio_type": "802.11n",
+    "channel": 1,
+    "authentication": "WPA2-Enterprise",
+    "cipher": "CCMP"
+  },
+  "gateway_reachability": {
+    "gateway_ip": "192.0.2.1",
+    "packets_sent": 10,
+    "packets_received": 3,
+    "packet_loss_percent": 70.0,
+    "avg_rtt_ms": 420.5
+  },
+  "dns_tests": [
+    {
+      "target": "portal.corp.example.com",
+      "server": "192.0.2.10",
+      "resolved": false,
+      "resolved_ips": [],
+      "rtt_ms": null,
+      "error": "Query timed out"
+    }
+  ],
+  "http_probe": {
+    "url": "http://www.msftconnecttest.com/connecttest.txt",
+    "status_code": 0,
+    "response_body_snippet": null,
+    "is_captive_portal": false,
+    "redirect_url": null,
+    "error": "Connection timed out"
+  },
+  "vpn": {
+    "client_installed": "None",
+    "connected": false,
+    "adapter_name": null,
+    "assigned_ip": null,
+    "tunnel_routes": []
+  }
+}

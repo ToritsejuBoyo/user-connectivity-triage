@@ -1,0 +1,80 @@
+{
+  "timestamp": "2026-11-08T14:25:00Z",
+  "hostname": "synthetic-laptop-06.corp.example.com",
+  "os": "Windows 11 Enterprise (23H2)",
+  "airplane_mode": false,
+  "adapters": [
+    {
+      "name": "Wi-Fi",
+      "type": "Wireless80211",
+      "status": "Up",
+      "mac_address": "00:11:22:33:44:aa",
+      "ipv4_addresses": [
+        "192.0.2.222"
+      ],
+      "subnet_mask": "255.255.255.0",
+      "ipv6_addresses": [],
+      "default_gateways": [
+        "192.0.2.1"
+      ],
+      "dns_servers": [
+        "192.0.2.1"
+      ],
+      "dhcp_enabled": true,
+      "dhcp_lease_obtained": "2026-11-08T14:20:00Z",
+      "dhcp_lease_expires": "2026-11-08T15:20:00Z",
+      "dhcp_server": "192.0.2.1"
+    }
+  ],
+  "wifi": {
+    "connected": true,
+    "ssid": "Hotel-Guest-WiFi",
+    "bssid": "00:11:22:bb:cc:dd",
+    "signal_percent": 82,
+    "radio_type": "802.11ac",
+    "channel": 6,
+    "authentication": "Open",
+    "cipher": "None"
+  },
+  "gateway_reachability": {
+    "gateway_ip": "192.0.2.1",
+    "packets_sent": 4,
+    "packets_received": 4,
+    "packet_loss_percent": 0.0,
+    "avg_rtt_ms": 4.1
+  },
+  "dns_tests": [
+    {
+      "target": "login.hotelportal.example",
+      "server": "192.0.2.1",
+      "resolved": true,
+      "resolved_ips": [
+        "192.0.2.1"
+      ],
+      "rtt_ms": 3.0
+    },
+    {
+      "target": "dns.google",
+      "server": "192.0.2.1",
+      "resolved": true,
+      "resolved_ips": [
+        "192.0.2.1"
+      ],
+      "rtt_ms": 2.9
+    }
+  ],
+  "http_probe": {
+    "url": "http://www.msftconnecttest.com/connecttest.txt",
+    "status_code": 302,
+    "response_body_snippet": "<html><body>Redirecting to login portal...</body></html>",
+    "is_captive_portal": true,
+    "redirect_url": "https://wifi.hotelportal.example/login?mac=00-11-22-33-44-aa"
+  },
+  "vpn": {
+    "client_installed": "Cisco AnyConnect",
+    "connected": false,
+    "adapter_name": null,
+    "assigned_ip": null,
+    "tunnel_routes": []
+  }
+}

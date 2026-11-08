@@ -1,0 +1,71 @@
+{
+  "timestamp": "2026-11-08T14:15:00Z",
+  "hostname": "synthetic-laptop-04.corp.example.com",
+  "os": "Windows 11 Enterprise (23H2)",
+  "airplane_mode": false,
+  "adapters": [
+    {
+      "name": "Ethernet",
+      "type": "Ethernet",
+      "status": "Up",
+      "mac_address": "00:11:22:33:44:88",
+      "ipv4_addresses": [
+        "192.0.2.210"
+      ],
+      "subnet_mask": "255.255.255.0",
+      "ipv6_addresses": [],
+      "default_gateways": [
+        "192.0.2.1"
+      ],
+      "dns_servers": [
+        "192.0.2.10"
+      ],
+      "dhcp_enabled": false,
+      "dhcp_lease_obtained": null,
+      "dhcp_lease_expires": null,
+      "dhcp_server": null
+    }
+  ],
+  "wifi": {
+    "connected": false,
+    "ssid": null,
+    "bssid": null,
+    "signal_percent": 0,
+    "radio_type": null,
+    "channel": 0,
+    "authentication": null,
+    "cipher": null
+  },
+  "gateway_reachability": {
+    "gateway_ip": "192.0.2.1",
+    "packets_sent": 4,
+    "packets_received": 0,
+    "packet_loss_percent": 100.0,
+    "avg_rtt_ms": null
+  },
+  "dns_tests": [
+    {
+      "target": "dns.google",
+      "server": "192.0.2.10",
+      "resolved": false,
+      "resolved_ips": [],
+      "rtt_ms": null,
+      "error": "Destination host unreachable"
+    }
+  ],
+  "http_probe": {
+    "url": "http://www.msftconnecttest.com/connecttest.txt",
+    "status_code": 0,
+    "response_body_snippet": null,
+    "is_captive_portal": false,
+    "redirect_url": null,
+    "error": "Host unreachable"
+  },
+  "vpn": {
+    "client_installed": "None",
+    "connected": false,
+    "adapter_name": null,
+    "assigned_ip": null,
+    "tunnel_routes": []
+  }
+}
