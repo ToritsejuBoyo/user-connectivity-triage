@@ -11,6 +11,7 @@ Zero third-party dependencies. Complies with Rule 3, Rule 4 (Sanitization), and 
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import sys
@@ -39,8 +40,12 @@ class TelemetrySanitizer:
         self._ip_cache: Dict[str, str] = {}
         self._counter = 1
 
-    def sanitize_ip(self, ip: str) -> str:
-        if not ip or ip.strip() == "":
+    def sanitize_ip(self, ip: Any) -> str:
+        if not ip:
+            return "" if ip is None else str(ip)
+        if not isinstance(ip, str):
+            ip = str(ip)
+        if ip.strip() == "":
             return ip
         ip_clean = ip.strip()
         # Preserve loopback and APIPA identifiers as they are essential for triage
@@ -51,53 +56,84 @@ class TelemetrySanitizer:
             self._counter += 1
         return self._ip_cache[ip_clean]
 
-    def sanitize_host(self, host: str) -> str:
+    def sanitize_host(self, host: Any) -> str:
         if not host:
+            return "" if host is not None and str(host) == "" else "unknown-host"
+        if not isinstance(host, str):
+            host = str(host)
+        if host.strip() == "":
             return host
+        host_str = host.strip()
         # Idempotent check: if already sanitized, do not re-hash
-        if host.startswith("host-") and host.endswith(".corp.example.com"):
-            return host
-        h = hashlib.sha256((host + self.salt).encode("utf-8")).hexdigest()[:8]
+        if host_str.startswith("host-") and host_str.endswith(".corp.example.com"):
+            return host_str
+        h = hashlib.sha256((host_str + self.salt).encode("utf-8")).hexdigest()[:8]
         return f"host-{h}.corp.example.com"
 
-    def sanitize_mac(self, mac: str) -> str:
+    def sanitize_mac(self, mac: Any) -> str:
         if not mac:
-            return mac
+            return ""
         return "00:11:22:xx:xx:xx"
 
-    def sanitize_bundle(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def sanitize_bundle(self, data: Any) -> Dict[str, Any]:
         """Deep copy and sanitize JSON telemetry."""
+        if not isinstance(data, dict):
+            return {"raw_input": str(data)}
+
         clean = json.loads(json.dumps(data))
-        if "hostname" in clean:
+        if "hostname" in clean and clean["hostname"]:
             clean["hostname"] = self.sanitize_host(clean["hostname"])
         
-        for adapter in clean.get("adapters", []):
-            if "mac_address" in adapter:
-                adapter["mac_address"] = self.sanitize_mac(adapter["mac_address"])
-            if "ipv4_addresses" in adapter:
-                adapter["ipv4_addresses"] = [self.sanitize_ip(ip) for ip in adapter["ipv4_addresses"]]
-            if "default_gateways" in adapter:
-                adapter["default_gateways"] = [self.sanitize_ip(gw) for gw in adapter["default_gateways"]]
-            if "dns_servers" in adapter:
-                adapter["dns_servers"] = [self.sanitize_ip(dns) for dns in adapter["dns_servers"]]
-            if "dhcp_server" in adapter and adapter["dhcp_server"]:
-                adapter["dhcp_server"] = self.sanitize_ip(adapter["dhcp_server"])
+        adapters = clean.get("adapters", [])
+        if isinstance(adapters, list):
+            for adapter in adapters:
+                if not isinstance(adapter, dict):
+                    continue
+                if "mac_address" in adapter and adapter["mac_address"]:
+                    adapter["mac_address"] = self.sanitize_mac(adapter["mac_address"])
+                
+                # Safe normalization of IP arrays
+                ips = adapter.get("ipv4_addresses")
+                if isinstance(ips, list):
+                    adapter["ipv4_addresses"] = [self.sanitize_ip(ip) for ip in ips if ip is not None]
+                elif isinstance(ips, (str, int)):
+                    adapter["ipv4_addresses"] = [self.sanitize_ip(ips)]
 
-        if "wifi" in clean and clean["wifi"].get("bssid"):
-            clean["wifi"]["bssid"] = self.sanitize_mac(clean["wifi"]["bssid"])
+                gws = adapter.get("default_gateways")
+                if isinstance(gws, list):
+                    adapter["default_gateways"] = [self.sanitize_ip(gw) for gw in gws if gw is not None]
+                elif isinstance(gws, (str, int)):
+                    adapter["default_gateways"] = [self.sanitize_ip(gws)]
 
-        gw = clean.get("gateway_reachability", {})
-        if gw.get("gateway_ip"):
+                dns_list = adapter.get("dns_servers")
+                if isinstance(dns_list, list):
+                    adapter["dns_servers"] = [self.sanitize_ip(dns) for dns in dns_list if dns is not None]
+                elif isinstance(dns_list, (str, int)):
+                    adapter["dns_servers"] = [self.sanitize_ip(dns_list)]
+
+                if "dhcp_server" in adapter and adapter["dhcp_server"]:
+                    adapter["dhcp_server"] = self.sanitize_ip(adapter["dhcp_server"])
+
+        wifi = clean.get("wifi")
+        if isinstance(wifi, dict) and wifi.get("bssid"):
+            wifi["bssid"] = self.sanitize_mac(wifi["bssid"])
+
+        gw = clean.get("gateway_reachability")
+        if isinstance(gw, dict) and gw.get("gateway_ip"):
             gw["gateway_ip"] = self.sanitize_ip(gw["gateway_ip"])
 
-        for dns in clean.get("dns_tests", []):
-            if dns.get("server"):
-                dns["server"] = self.sanitize_ip(dns["server"])
-            if dns.get("resolved_ips"):
-                dns["resolved_ips"] = [self.sanitize_ip(ip) for ip in dns["resolved_ips"]]
+        dns_tests = clean.get("dns_tests")
+        if isinstance(dns_tests, list):
+            for dns in dns_tests:
+                if isinstance(dns, dict):
+                    if dns.get("server"):
+                        dns["server"] = self.sanitize_ip(dns["server"])
+                    resolved_ips = dns.get("resolved_ips")
+                    if isinstance(resolved_ips, list):
+                        dns["resolved_ips"] = [self.sanitize_ip(ip) for ip in resolved_ips if ip is not None]
 
-        vpn = clean.get("vpn", {})
-        if vpn.get("assigned_ip"):
+        vpn = clean.get("vpn")
+        if isinstance(vpn, dict) and vpn.get("assigned_ip"):
             vpn["assigned_ip"] = self.sanitize_ip(vpn["assigned_ip"])
 
         return clean
@@ -248,8 +284,12 @@ class ConnectivityTriageEngine:
         if isinstance(wifi, dict) and wifi.get("connected"):
             raw_sig = wifi.get("signal_percent", 0)
             try:
-                sig = int(float(str(raw_sig).strip()))
-            except (ValueError, TypeError):
+                sig_float = float(str(raw_sig).strip())
+                if math.isnan(sig_float) or math.isinf(sig_float):
+                    sig = 0
+                else:
+                    sig = int(sig_float)
+            except (ValueError, TypeError, OverflowError):
                 sig = 0
 
             # Support dBm format (e.g. -85 dBm) or percentage (0-100)
@@ -286,6 +326,8 @@ class ConnectivityTriageEngine:
 
     def _check_layer3_network_ip(self) -> Optional[TriageFinding]:
         adapters = self.raw_data.get("adapters") or []
+        if not isinstance(adapters, list):
+            adapters = []
         up_adapters = [a for a in adapters if isinstance(a, dict) and a.get("status") == "Up"]
 
         apipa_found = False
@@ -294,8 +336,21 @@ class ConnectivityTriageEngine:
         evidence = []
 
         for a in up_adapters:
-            ips = a.get("ipv4_addresses") or []
-            gws = a.get("default_gateways") or []
+            ips_raw = a.get("ipv4_addresses") or []
+            if isinstance(ips_raw, (str, int)):
+                ips = [str(ips_raw)]
+            elif isinstance(ips_raw, list):
+                ips = [str(ip) for ip in ips_raw if ip is not None]
+            else:
+                ips = []
+
+            gws_raw = a.get("default_gateways") or []
+            if isinstance(gws_raw, (str, int)):
+                gws = [str(gws_raw)]
+            elif isinstance(gws_raw, list):
+                gws = [str(gw) for gw in gws_raw if gw is not None]
+            else:
+                gws = []
             
             has_valid_on_adapter = False
             for ip in ips:
@@ -310,7 +365,7 @@ class ConnectivityTriageEngine:
                     has_valid_on_adapter = True
                     valid_ip_found = True
 
-            if has_valid_on_adapter and not gws and not a.get("name", "").lower().startswith("loopback"):
+            if has_valid_on_adapter and not gws and not str(a.get("name", "")).lower().startswith("loopback"):
                 evidence.append(f"Interface '{a.get('name')}' has no default gateway configured")
 
         # Multi-homing intelligence: If another adapter has a valid IP and gateway, APIPA is a secondary warning
@@ -380,16 +435,26 @@ class ConnectivityTriageEngine:
 
         raw_loss = gw_test.get("packet_loss_percent", 0.0)
         try:
-            loss = float(raw_loss) if raw_loss is not None else 100.0
-        except (ValueError, TypeError):
+            loss_f = float(raw_loss) if raw_loss is not None else 100.0
+            if math.isnan(loss_f) or loss_f < 0.0:
+                loss = 0.0
+            elif math.isinf(loss_f) or loss_f >= 100.0:
+                loss = 100.0
+            else:
+                loss = loss_f
+        except (ValueError, TypeError, OverflowError):
             loss = 100.0
 
         gw_ip = gw_test.get("gateway_ip")
         
         raw_rtt = gw_test.get("avg_rtt_ms")
         try:
-            rtt = float(raw_rtt) if raw_rtt is not None else None
-        except (ValueError, TypeError):
+            rtt_f = float(raw_rtt) if raw_rtt is not None else None
+            if rtt_f is not None and (math.isnan(rtt_f) or math.isinf(rtt_f) or rtt_f < 0.0):
+                rtt = None
+            else:
+                rtt = rtt_f
+        except (ValueError, TypeError, OverflowError):
             rtt = None
 
         if loss >= 100.0 and gw_ip:
@@ -523,8 +588,17 @@ class ConnectivityTriageEngine:
     def _check_layer7_vpn(self) -> Optional[TriageFinding]:
         vpn = self.raw_data.get("vpn") or {}
         if isinstance(vpn, dict) and vpn.get("connected"):
-            missing = vpn.get("missing_corporate_routes") or []
-            dns_leak = vpn.get("split_dns_leak", False)
+            missing_raw = vpn.get("missing_corporate_routes") or []
+            if isinstance(missing_raw, list):
+                missing = [str(r) for r in missing_raw if r is not None]
+            elif isinstance(missing_raw, dict):
+                missing = [str(k) for k in missing_raw.keys()]
+            elif isinstance(missing_raw, (str, int, float)):
+                missing = [str(missing_raw)]
+            else:
+                missing = []
+
+            dns_leak = bool(vpn.get("split_dns_leak", False))
 
             if missing or dns_leak:
                 evidence = []
@@ -719,8 +793,8 @@ def main():
     engine = ConnectivityTriageEngine(data)
     findings = engine.evaluate()
 
-    hostname = data.get("hostname", "unknown-host")
-    os_info = data.get("os", "Unknown OS")
+    hostname = str(data.get("hostname", "unknown-host")) if isinstance(data, dict) else "unknown-host"
+    os_info = str(data.get("os", "Unknown OS")) if isinstance(data, dict) else "Unknown OS"
 
     if args.json:
         payload = {
