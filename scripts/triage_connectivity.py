@@ -54,6 +54,9 @@ class TelemetrySanitizer:
     def sanitize_host(self, host: str) -> str:
         if not host:
             return host
+        # Idempotent check: if already sanitized, do not re-hash
+        if host.startswith("host-") and host.endswith(".corp.example.com"):
+            return host
         h = hashlib.sha256((host + self.salt).encode("utf-8")).hexdigest()[:8]
         return f"host-{h}.corp.example.com"
 
@@ -173,6 +176,18 @@ class ConnectivityTriageEngine:
         return self.findings
 
     def _check_layer1_physical(self) -> Optional[TriageFinding]:
+        if not self.raw_data or not isinstance(self.raw_data, dict):
+            return TriageFinding(
+                layer_number=1,
+                layer_name="Physical / Hardware State",
+                status="FAIL",
+                root_cause_summary="Telemetry payload is empty or not a valid dictionary.",
+                technical_evidence=["Invalid or null telemetry object"],
+                remediation_steps_user=["Rerun connectivity collector."],
+                remediation_steps_admin=["Verify telemetry JSON structure."],
+                escalation_priority="P2 - High"
+            )
+
         # Airplane mode check
         if self.raw_data.get("airplane_mode", False):
             return TriageFinding(
@@ -190,7 +205,7 @@ class ConnectivityTriageEngine:
                 escalation_priority="P3 - Medium"
             )
 
-        adapters = self.raw_data.get("adapters", [])
+        adapters = self.raw_data.get("adapters") or []
         if not adapters:
             return TriageFinding(
                 layer_number=1,
@@ -210,14 +225,14 @@ class ConnectivityTriageEngine:
             )
 
         # Check if every adapter is Down/Disabled
-        up_adapters = [a for a in adapters if a.get("status") == "Up"]
+        up_adapters = [a for a in adapters if isinstance(a, dict) and a.get("status") == "Up"]
         if not up_adapters:
             return TriageFinding(
                 layer_number=1,
                 layer_name="Physical / Hardware State",
                 status="FAIL",
                 root_cause_summary="All network interfaces are currently in a Down or Disconnected state.",
-                technical_evidence=[f"Adapter '{a.get('name')}' status: {a.get('status')}" for a in adapters],
+                technical_evidence=[f"Adapter '{a.get('name', 'Unknown')}' status: {a.get('status', 'Unknown')}" for a in adapters if isinstance(a, dict)],
                 remediation_steps_user=[
                     "Verify Ethernet cable is plugged firmly into laptop and docking station.",
                     "Ensure Wi-Fi switch is turned on and laptop is not in flight mode."
@@ -229,19 +244,31 @@ class ConnectivityTriageEngine:
         return None
 
     def _check_layer2_datalink(self) -> Optional[TriageFinding]:
-        wifi = self.raw_data.get("wifi", {})
-        if wifi.get("connected"):
-            sig = wifi.get("signal_percent", 0)
-            if sig < 25:
+        wifi = self.raw_data.get("wifi") or {}
+        if isinstance(wifi, dict) and wifi.get("connected"):
+            raw_sig = wifi.get("signal_percent", 0)
+            try:
+                sig = int(float(str(raw_sig).strip()))
+            except (ValueError, TypeError):
+                sig = 0
+
+            # Support dBm format (e.g. -85 dBm) or percentage (0-100)
+            is_weak = False
+            if sig < 0:
+                is_weak = (sig <= -80)  # -80 dBm or lower is critical weak RF
+            else:
+                is_weak = (sig < 25)
+
+            if is_weak:
                 return TriageFinding(
                     layer_number=2,
                     layer_name="Data Link / Wi-Fi Association",
                     status="WARN",
                     root_cause_summary=f"Extremely weak Wi-Fi signal quality ({sig}%), causing heavy packet drops and frame retries.",
                     technical_evidence=[
-                        f"Connected SSID: {wifi.get('ssid')}",
-                        f"BSSID: {wifi.get('bssid')}",
-                        f"Reported Wi-Fi Signal: {sig}% (Critical threshold is < 25%)",
+                        f"Connected SSID: {wifi.get('ssid', 'Unknown')}",
+                        f"BSSID: {wifi.get('bssid', 'Unknown')}",
+                        f"Reported Wi-Fi Signal: {sig}% (Critical threshold is < 25% or <= -80 dBm)",
                         f"Radio Band: {wifi.get('radio_type', 'Unknown')} on Channel {wifi.get('channel', 0)}"
                     ],
                     remediation_steps_user=[
@@ -258,28 +285,36 @@ class ConnectivityTriageEngine:
         return None
 
     def _check_layer3_network_ip(self) -> Optional[TriageFinding]:
-        adapters = self.raw_data.get("adapters", [])
-        up_adapters = [a for a in adapters if a.get("status") == "Up"]
+        adapters = self.raw_data.get("adapters") or []
+        up_adapters = [a for a in adapters if isinstance(a, dict) and a.get("status") == "Up"]
 
         apipa_found = False
+        valid_ip_found = False
         no_ip_found = True
         evidence = []
 
         for a in up_adapters:
-            ips = a.get("ipv4_addresses", [])
-            gws = a.get("default_gateways", [])
+            ips = a.get("ipv4_addresses") or []
+            gws = a.get("default_gateways") or []
             
+            has_valid_on_adapter = False
             for ip in ips:
-                if ip and not ip.startswith("127."):
+                if not ip or not isinstance(ip, str):
+                    continue
+                if not ip.startswith("127."):
                     no_ip_found = False
                 if ip.startswith("169.254."):
                     apipa_found = True
                     evidence.append(f"Interface '{a.get('name')}' assigned APIPA address: {ip} (Subnet: {a.get('subnet_mask')})")
+                elif not ip.startswith("127.") and not ip.startswith("0."):
+                    has_valid_on_adapter = True
+                    valid_ip_found = True
 
-            if not gws and not a.get("name", "").lower().startswith("loopback"):
+            if has_valid_on_adapter and not gws and not a.get("name", "").lower().startswith("loopback"):
                 evidence.append(f"Interface '{a.get('name')}' has no default gateway configured")
 
-        if apipa_found:
+        # Multi-homing intelligence: If another adapter has a valid IP and gateway, APIPA is a secondary warning
+        if apipa_found and not valid_ip_found:
             return TriageFinding(
                 layer_number=3,
                 layer_name="Network / IP Configuration (DHCP Failure)",
@@ -298,6 +333,31 @@ class ConnectivityTriageEngine:
                 ],
                 escalation_priority="P2 - High"
             )
+        elif apipa_found and valid_ip_found:
+            # Secondary virtual/inactive adapter has APIPA, but primary has valid IP
+            return TriageFinding(
+                layer_number=3,
+                layer_name="Network / IP Configuration",
+                status="WARN",
+                root_cause_summary="Secondary network interface has an unconfigured APIPA address, but primary interface has valid IP.",
+                technical_evidence=evidence,
+                remediation_steps_user=["Verify primary network interface is connected."],
+                remediation_steps_admin=["Disable unused virtual or secondary network adapters."],
+                escalation_priority="P3 - Medium"
+            )
+
+        has_any_gateway = any(a.get("default_gateways") for a in up_adapters if isinstance(a, dict))
+        if valid_ip_found and not has_any_gateway and not apipa_found:
+            return TriageFinding(
+                layer_number=3,
+                layer_name="Network / IP Configuration (Missing Gateway)",
+                status="FAIL",
+                root_cause_summary="Active network interface has a valid IP address, but no default gateway is configured.",
+                technical_evidence=evidence if evidence else ["No default gateway configured on any active network interface"],
+                remediation_steps_user=["Verify network router DHCP settings or reconnect to network."],
+                remediation_steps_admin=["Verify static IP configuration includes valid default gateway address."],
+                escalation_priority="P2 - High"
+            )
 
         if no_ip_found:
             return TriageFinding(
@@ -314,12 +374,25 @@ class ConnectivityTriageEngine:
         return None
 
     def _check_layer4_gateway(self) -> Optional[TriageFinding]:
-        gw_test = self.raw_data.get("gateway_reachability", {})
-        loss = gw_test.get("packet_loss_percent", 0.0)
-        gw_ip = gw_test.get("gateway_ip")
-        rtt = gw_test.get("avg_rtt_ms")
+        gw_test = self.raw_data.get("gateway_reachability") or {}
+        if not isinstance(gw_test, dict):
+            return None
 
-        if loss >= 100.0:
+        raw_loss = gw_test.get("packet_loss_percent", 0.0)
+        try:
+            loss = float(raw_loss) if raw_loss is not None else 100.0
+        except (ValueError, TypeError):
+            loss = 100.0
+
+        gw_ip = gw_test.get("gateway_ip")
+        
+        raw_rtt = gw_test.get("avg_rtt_ms")
+        try:
+            rtt = float(raw_rtt) if raw_rtt is not None else None
+        except (ValueError, TypeError):
+            rtt = None
+
+        if loss >= 100.0 and gw_ip:
             return TriageFinding(
                 layer_number=4,
                 layer_name="Transport / Gateway Reachability",
@@ -341,6 +414,21 @@ class ConnectivityTriageEngine:
                 ],
                 escalation_priority="P2 - High"
             )
+        elif loss > 0.0 and loss < 100.0:
+            return TriageFinding(
+                layer_number=4,
+                layer_name="Transport / Gateway Reachability",
+                status="WARN",
+                root_cause_summary=f"Intermittent packet loss to default gateway ({loss:.1f}% loss).",
+                technical_evidence=[
+                    f"Target Gateway: {gw_ip}",
+                    f"Packet Loss: {loss:.1f}% ({gw_test.get('packets_received')}/{gw_test.get('packets_sent')} packets received)",
+                    f"Average RTT: {rtt} ms" if rtt else "RTT unavailable"
+                ],
+                remediation_steps_user=["Check for loose network cables or wireless interference."],
+                remediation_steps_admin=["Inspect switch port error counters (CRC errors, duplex mismatch)."],
+                escalation_priority="P3 - Medium"
+            )
 
         if rtt and rtt > 350.0:
             return TriageFinding(
@@ -360,11 +448,13 @@ class ConnectivityTriageEngine:
         return None
 
     def _check_layer5_dns(self) -> Optional[TriageFinding]:
-        dns_tests = self.raw_data.get("dns_tests", [])
-        if not dns_tests:
+        dns_tests = self.raw_data.get("dns_tests") or []
+        if not isinstance(dns_tests, list) or not dns_tests:
             return None
 
-        failed_tests = [t for t in dns_tests if not t.get("resolved")]
+        failed_tests = [t for t in dns_tests if isinstance(t, dict) and not t.get("resolved")]
+        
+        # If all lookups failed
         if len(failed_tests) == len(dns_tests) and len(dns_tests) > 0:
             evidence = []
             for t in failed_tests:
@@ -387,12 +477,25 @@ class ConnectivityTriageEngine:
                 ],
                 escalation_priority="P2 - High"
             )
+        elif failed_tests:
+            # Partial lookup failure (e.g. corporate internal fails, public succeeds)
+            evidence = [f"Failed: '{t.get('target')}' ({t.get('error')})" for t in failed_tests]
+            return TriageFinding(
+                layer_number=5,
+                layer_name="Application / DNS Name Resolution",
+                status="WARN",
+                root_cause_summary="Partial DNS failure: specific domain names failed to resolve while others succeeded.",
+                technical_evidence=evidence,
+                remediation_steps_user=["Flush local DNS cache via 'ipconfig /flushdns'."],
+                remediation_steps_admin=["Verify search domain suffixes and specific zone delegation."],
+                escalation_priority="P3 - Medium"
+            )
 
         return None
 
     def _check_layer6_captive_portal(self) -> Optional[TriageFinding]:
-        probe = self.raw_data.get("http_probe", {})
-        if probe.get("is_captive_portal"):
+        probe = self.raw_data.get("http_probe") or {}
+        if isinstance(probe, dict) and probe.get("is_captive_portal"):
             redirect = probe.get("redirect_url")
             code = probe.get("status_code")
             return TriageFinding(
@@ -418,9 +521,9 @@ class ConnectivityTriageEngine:
         return None
 
     def _check_layer7_vpn(self) -> Optional[TriageFinding]:
-        vpn = self.raw_data.get("vpn", {})
-        if vpn.get("connected"):
-            missing = vpn.get("missing_corporate_routes", [])
+        vpn = self.raw_data.get("vpn") or {}
+        if isinstance(vpn, dict) and vpn.get("connected"):
+            missing = vpn.get("missing_corporate_routes") or []
             dns_leak = vpn.get("split_dns_leak", False)
 
             if missing or dns_leak:
@@ -659,3 +762,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
