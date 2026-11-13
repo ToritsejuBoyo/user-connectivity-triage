@@ -19,6 +19,21 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# ---------------------------------------------------------------------------
+# Shared residual sanitization pass (vendored: scripts/sanitizer.py).
+# Applied to rendered output rather than to the input bundle: scrubbing the bundle
+# before analysis would strip values the analysis reads and could change the
+# verdict. See tests/sanitizer_conformance_test.py for the contract.
+# ---------------------------------------------------------------------------
+try:
+    from sanitizer import residual_scrub as _residual_scrub
+except ImportError:  # pragma: no cover - direct execution from another cwd
+    import os as _os
+    import sys as _sys
+    _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+    from sanitizer import residual_scrub as _residual_scrub
+
+
 
 @dataclass
 class TriageFinding:
@@ -814,21 +829,30 @@ def main():
                 for f in findings
             ]
         }
-        print(json.dumps(payload, indent=2))
+        _json_out = json.dumps(payload, indent=2)
+        if args.sanitize:
+            _json_out = _residual_scrub(_json_out)
+        print(_json_out)
         return
 
     # Console output
     console_out = ReportFormatter.format_console(findings, hostname, os_info)
+    if args.sanitize:
+        console_out = _residual_scrub(console_out)
     print(console_out)
 
     if args.output:
         md_out = ReportFormatter.generate_markdown(findings, hostname, os_info)
+        if args.sanitize:
+            md_out = _residual_scrub(md_out)
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(md_out)
         print(f"Markdown assessment report written to: {args.output}")
 
     if args.generate_tickets:
         ticket_out = ReportFormatter.generate_itsm_ticket(findings, hostname, os_info)
+        if args.sanitize:
+            ticket_out = _residual_scrub(ticket_out)
         with open(args.generate_tickets, "w", encoding="utf-8") as f:
             f.write(ticket_out)
         print(f"ITSM escalation ticket written to: {args.generate_tickets}")

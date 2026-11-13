@@ -2,6 +2,13 @@
 
 ![user-connectivity-triage Demo](assets/demo.gif)
 
+[![tests](https://github.com/ToritsejuBoyo/user-connectivity-triage/actions/workflows/tests.yml/badge.svg)](https://github.com/ToritsejuBoyo/user-connectivity-triage/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)]()
+[![Dependencies](https://img.shields.io/badge/dependencies-zero%20(stdlib%20only)-brightgreen.svg)](CONTRIBUTING.md)
+[![Security](https://img.shields.io/badge/security-read--only%20%7C%20no%20egress-informational.svg)](SECURITY.md)
+[![Standard](https://img.shields.io/badge/standard-agentskills.io-blueviolet.svg)](https://agentskills.io)
+
 > An HD recording is available in [`assets/demo.mp4`](assets/demo.mp4).
 
 Deterministic, read-only Level 1 Help Desk diagnostic collector and decision-tree triage engine for **Wi-Fi, Ethernet, DHCP/APIPA, Default Gateway, DNS, Captive Portal, and VPN** connectivity disruptions. Ingests endpoint diagnostic JSON, pinpoints the exact failure layer across a 7-tier network model, and generates non-destructive user resolution steps and audit-ready L2/L3 escalation briefs.

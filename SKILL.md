@@ -1,6 +1,16 @@
 ---
 name: user-connectivity-triage
-description: Diagnoses endpoint Wi-Fi, DHCP, DNS, Captive Portal, and VPN failures across a 7-layer decision tree from read-only telemetry.
+description: >-
+  Diagnoses endpoint Wi-Fi, DHCP, DNS, Captive Portal, and VPN failures across a 7-layer decision
+  tree from read-only telemetry. Use when a user cannot reach the network or a specific
+  application, Wi-Fi associates but has no traffic, DHCP or DNS resolution fails, a captive portal
+  blocks corporate access, or a VPN tunnel fails or leaks DNS.
+license: MIT
+version: 1.0.0
+metadata:
+  standard: agentskills.io
+  dependencies: none (Python standard library only)
+  access: read-only collectors; no state is modified on target systems
 ---
 
 # User Connectivity Triage (`user-connectivity-triage`)
@@ -74,3 +84,41 @@ When an agent receives user complaints such as "My internet is down", "I can't o
 3. Read the `layer_number`, `status`, and `root_cause`.
 4. Provide the user with the exact 3-step non-destructive self-service commands from `remediation_user`.
 5. If the failure requires network engineering intervention (e.g. DHCP pool exhaustion, gateway outage, DNS forwarder crash), generate the pre-formatted L2/L3 ticket from `remediation_admin`.
+
+---
+
+## Bundled Resources
+
+Load these on demand — they hold the decision logic behind the 7-layer triage tree.
+
+- **7-Layer Decision Tree:** [`references/7-layer-connectivity-decision-tree.md`](references/7-layer-connectivity-decision-tree.md) — Authoritative specification of the decision heuristics used to diagnose network disruptions from endpoint telemetry. **Consult before issuing any layer verdict.**
+- **Captive Portal Rubric:** [`references/captive-portal-detection-rubric.md`](references/captive-portal-detection-rubric.md) — How hotel/airport/cafe splash screens are detected and distinguished from DNS and VPN failures.
+- **VPN Split-Tunnel Guide:** [`references/vpn-split-tunnel-triage-guide.md`](references/vpn-split-tunnel-triage-guide.md) — Enterprise VPN failure modes and DNS leak analysis. **Consult for any Layer 7 verdict.**
+- **Diagnostic Report Template:** [`assets/connectivity-report-template.md`](assets/connectivity-report-template.md) — Structured user connectivity diagnostic report.
+- **L2 Escalation Template:** [`assets/l2-escalation-ticket-template.md`](assets/l2-escalation-ticket-template.md) — ITSM L2/L3 escalation brief.
+
+---
+
+## Data Handling & Sanitization
+
+Sanitization runs **client-side, before any output is produced**, so credentials and
+personal data are removed on the operator's machine rather than being sent to a model
+or pasted into a ticket.
+
+Two layers apply:
+
+1. This skill's own domain-aware masking (hostnames, accounts, and the identifiers
+   specific to this domain).
+2. A shared residual pass, [`scripts/sanitizer.py`](scripts/sanitizer.py), vendored
+   identically across every skill in the library. It is the common floor: private keys,
+   cloud provider keys, JWTs and bearer tokens, connection-string passwords, assigned
+   secrets, emails, IPv4/IPv6 addresses, MAC addresses, GUIDs, SSNs, payment card
+   numbers, and phone numbers.
+
+The contract is enforced by `tests/sanitizer_conformance_test.py`, which runs the same
+adversarial corpus in every skill. Documentation placeholders (RFC 5737/3849 addresses,
+RFC 7042 MAC ranges, `example.com` names, and existing `[REDACTED-*]` tokens) are
+preserved, so the pass is safe to apply more than once.
+
+Sanitization is thorough and tested, but it is not a substitute for reading output
+before sharing it outside your organization.
